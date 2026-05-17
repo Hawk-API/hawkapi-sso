@@ -1,6 +1,6 @@
 # hawkapi-sso
 
-Social SSO for [HawkAPI](https://github.com/ashimov/HawkAPI). One plugin, six providers:
+Social SSO for [HawkAPI](https://github.com/Hawk-API/HawkAPI). One plugin, six providers:
 
 - **Google** (OAuth2 + OIDC, PKCE)
 - **GitHub** (OAuth2)
@@ -109,7 +109,7 @@ init_sso(
 ## Development
 
 ```bash
-git clone https://github.com/ashimov/hawkapi-sso.git
+git clone https://github.com/Hawk-API/hawkapi-sso.git
 cd hawkapi-sso
 uv sync --extra dev
 uv run pytest -q

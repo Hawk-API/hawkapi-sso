@@ -40,8 +40,8 @@ dev = [
 
 [project.urls]
 Homepage = "https://pypi.org/project/hawkapi-sso/"
-Repository = "https://github.com/ashimov/hawkapi-sso"
-Issues = "https://github.com/ashimov/hawkapi-sso/issues"
+Repository = "https://github.com/Hawk-API/hawkapi-sso"
+Issues = "https://github.com/Hawk-API/hawkapi-sso/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hawkapi_sso"]
