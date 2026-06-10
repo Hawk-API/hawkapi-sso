@@ -10,6 +10,8 @@ it.
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 from ._base import OAuthError, OAuthProvider, OAuthToken, OAuthUser, make_pkce
 from ._discord import DiscordProvider
 from ._facebook import FacebookProvider
@@ -20,7 +22,10 @@ from ._microsoft import MicrosoftProvider
 from ._plugin import SSOConfig, get_sso, init_sso, resolve_sso
 from ._state import StatePayload, new_nonce, sign_state, verify_state
 
-__version__ = "0.1.0"
+try:
+    __version__ = version("hawkapi-sso")
+except PackageNotFoundError:  # pragma: no cover - running from a source tree without install
+    __version__ = "0.0.0"
 
 __all__ = [
     "DiscordProvider",
