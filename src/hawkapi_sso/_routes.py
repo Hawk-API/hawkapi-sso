@@ -129,9 +129,12 @@ def attach_routes(app: Any, cfg: Any) -> None:
         # next_url is the in-app URL we redirect to on success — never a full URL.
         # Reject anything with a scheme or netloc (``//host``, ``https:`` …) and
         # normalize backslashes, which some browsers treat as ``/`` (CWE-601).
-        next_url = request.query_params.get("next", cfg.success_redirect)
-        if not _is_safe_next(next_url):
-            next_url = cfg.success_redirect
+        next_param = request.query_params.get("next", cfg.success_redirect)
+        next_url: str = (
+            next_param
+            if isinstance(next_param, str) and _is_safe_next(next_param)
+            else cfg.success_redirect
+        )
 
         # PKCE — only meaningful where the provider supports it.
         verifier = ""

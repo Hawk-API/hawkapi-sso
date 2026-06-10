@@ -15,9 +15,7 @@ ISS = "https://accounts.google.com"
 
 def _google() -> GoogleProvider:
     g = GoogleProvider(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
-    attach_mock_transport(
-        g, lambda req: httpx.Response(200, json=jwks_for())
-    )
+    attach_mock_transport(g, lambda req: httpx.Response(200, json=jwks_for()))
     return g
 
 
@@ -71,9 +69,7 @@ async def test_expired_id_token_rejected() -> None:
     g = _google()
     tok = OAuthToken(
         access_token="AT",
-        id_token=sign_id_token(
-            sub="u-1", aud=CLIENT_ID, iss=ISS, nonce="n1", exp_delta=-3600
-        ),
+        id_token=sign_id_token(sub="u-1", aud=CLIENT_ID, iss=ISS, nonce="n1", exp_delta=-3600),
     )
     with pytest.raises(OAuthError, match="validation failed"):
         await g.verify_id_token(tok, nonce="n1")
