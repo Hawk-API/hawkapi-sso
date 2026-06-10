@@ -106,12 +106,75 @@ def test_init_sso_rejects_short_state_secret() -> None:
         )
 
 
+def test_callback_provider_error_redirects_to_failure() -> None:
+    """OAuth ``error`` param → clear cookie + redirect to failure_redirect (not 400)."""
+    app, _ = _build_app()
+    client = TestClient(app)
+    client.get("/auth/sso/login/google")
+    r = client.get("/auth/sso/callback/google?error=access_denied")
+    assert r.status_code == 302
+    assert r.headers["location"] == "/login?error=sso"
+    cleared = r.headers.get("set-cookie", "")
+    assert "Max-Age=0" in cleared
+
+
+def test_callback_bad_state_returns_generic_detail() -> None:
+    """Validation reason must not leak in the response body."""
+    app, _ = _build_app()
+    forged = "not.a.valid.token"
+    r = TestClient(app).get(
+        f"/auth/sso/callback/google?code=xyz&state={forged}",
+        headers={"cookie": f"hawkapi_sso_state={forged}"},
+    )
+    assert r.status_code == 400
+    assert "invalid state" in r.text
+    assert "malformed" not in r.text
+
+
+def test_backslash_next_rejected() -> None:
+    """``?next=/\\attacker.com`` must not survive into the signed state."""
+    app, _ = _build_app()
+    client = TestClient(app)
+    r = client.get("/auth/sso/login/google?next=/\\attacker.com/path")
+    cookie = r.headers["set-cookie"]
+    token = cookie.split("hawkapi_sso_state=", 1)[1].split(";", 1)[0]
+    from hawkapi_sso import verify_state
+
+    assert verify_state(token, secret=STATE_SECRET).next_url == "/"
+
+
 def test_callback_happy_path_with_matched_state() -> None:
     app, google = _build_app()
 
+    from .oidc_helpers import jwks_for, sign_id_token
+
+    client = TestClient(app)
+    login = client.get("/auth/sso/login/google")
+    set_cookie = login.headers["set-cookie"]
+    cookie_state = set_cookie.split("hawkapi_sso_state=", 1)[1].split(";", 1)[0]
+    # The nonce sent to the provider is carried in the state; reuse it in the id_token.
+    from hawkapi_sso import verify_state
+
+    nonce = verify_state(cookie_state, secret=STATE_SECRET).nonce
+    # The URL ``state`` is the verifier-free token embedded in the authorize URL.
+    location = login.headers["location"]
+    url_state = location.split("state=", 1)[1].split("&", 1)[0]
+    from urllib.parse import unquote
+
+    url_state = unquote(url_state)
+
+    id_token = sign_id_token(
+        sub="u-1",
+        aud=CLIENT_ID,
+        iss="https://accounts.google.com",
+        nonce=nonce,
+    )
+
     def handle(request: httpx.Request) -> httpx.Response:
+        if "/oauth2/v3/certs" in request.url.path:
+            return httpx.Response(200, json=jwks_for())
         if request.url.path.endswith("/token"):
-            return httpx.Response(200, json={"access_token": "AT"})
+            return httpx.Response(200, json={"access_token": "AT", "id_token": id_token})
         if "userinfo" in request.url.path:
             return httpx.Response(
                 200,
@@ -121,14 +184,9 @@ def test_callback_happy_path_with_matched_state() -> None:
 
     attach_mock_transport(google, handle)
 
-    client = TestClient(app)
-    login = client.get("/auth/sso/login/google")
-    set_cookie = login.headers["set-cookie"]
-    state = set_cookie.split("hawkapi_sso_state=", 1)[1].split(";", 1)[0]
-
     r = client.get(
-        f"/auth/sso/callback/google?code=xyz&state={state}",
-        headers={"cookie": f"hawkapi_sso_state={state}"},
+        f"/auth/sso/callback/google?code=xyz&state={url_state}",
+        headers={"cookie": f"hawkapi_sso_state={cookie_state}"},
     )
     assert r.status_code == 302
     cleared = r.headers.get("set-cookie", "")

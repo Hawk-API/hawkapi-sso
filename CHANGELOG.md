@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0 — 2026-06-10
+
+Security hardening.
+
+This release is a behavior and compatibility change: it adds a new required dependency, `PyJWT[crypto]`, and OIDC providers now cryptographically validate the `id_token` on callback (a misconfigured provider that previously "worked" may now be rejected).
+
+- OIDC ID tokens are now cryptographically validated: the signature is verified against the provider JWKS, plus `iss` / `aud` / `exp` / `nonce` checks, and the validated `sub` is treated as the authoritative identity (it was previously accepted unverified — CWE-347). Added the `PyJWT[crypto]` dependency. A `nonce` is now sent on the authorize request for OIDC providers.
+- PKCE `code_verifier` is no longer placed in the `state` value sent to the provider; it is kept only in the server-side state cookie, which is never transmitted to the authorization server (CWE-200).
+- The callback `redirect_uri` derived from the request `Host` header is validated against a configurable `allowed_hosts` allowlist; `base_url` can pin it explicitly (CWE-601 / SSRF).
+- The OAuth `error` callback parameter is now handled — the state cookie is cleared and the user is redirected to `failure_redirect` instead of returning a misleading 400.
+- State validation failures return a generic `invalid state` detail; the underlying reason is logged internally rather than leaked to the client (CWE-209).
+- Provider `token_url` / `userinfo_url` / `jwks_url` must be HTTPS, and the HTTP client no longer follows redirects (SSRF hardening — CWE-918).
+- `OAuthToken.__repr__` masks the access / refresh / id tokens and the raw token body (CWE-532).
+- `next` redirect validation now rejects any value carrying a scheme or netloc and normalizes backslashes, which some browsers treat as `/` (open redirect — CWE-601).
+
 ## 0.1.0 — 2026-05-16
 
 Initial release.

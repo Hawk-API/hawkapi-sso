@@ -17,6 +17,11 @@ class StatePayload:
     provider: str
     redirect_uri: str
     next_url: str = "/"
+    # NOTE: ``code_verifier`` is intentionally NOT serialized into the signed
+    # state token — that token travels to the authorization server as the
+    # ``state=`` query param, where the PKCE verifier would leak (provider logs,
+    # Referer) and defeat PKCE. It is carried instead in a separate server-side
+    # cookie (see ``sign_pkce`` / the routes module) that is never sent upstream.
     code_verifier: str = ""
     iat: int = 0
 
@@ -35,8 +40,14 @@ def _ub64(data: str) -> bytes:
     return base64.urlsafe_b64decode(data.encode("ascii"))
 
 
-def sign_state(payload: StatePayload, *, secret: str) -> str:
-    """Sign a state payload. Output is ``base64(json).base64(hmac)``."""
+def sign_state(payload: StatePayload, *, secret: str, include_verifier: bool = False) -> str:
+    """Sign a state payload. Output is ``base64(json).base64(hmac)``.
+
+    ``include_verifier`` MUST stay ``False`` for the token placed in the ``state=``
+    authorization URL param — the PKCE ``code_verifier`` would otherwise leak to the
+    provider. It is set ``True`` only for the value stored in the state COOKIE, which
+    is never transmitted to the authorization server.
+    """
     if not secret:
         raise ValueError("state secret is required")
     body = {
@@ -44,9 +55,10 @@ def sign_state(payload: StatePayload, *, secret: str) -> str:
         "provider": payload.provider,
         "redirect_uri": payload.redirect_uri,
         "next_url": payload.next_url,
-        "code_verifier": payload.code_verifier,
         "iat": payload.iat or int(time.time()),
     }
+    if include_verifier:
+        body["code_verifier"] = payload.code_verifier
     body_bytes = json.dumps(body, separators=(",", ":"), sort_keys=True).encode("utf-8")
     sig = hmac.new(secret.encode("utf-8"), body_bytes, hashlib.sha256).digest()
     return f"{_b64(body_bytes)}.{_b64(sig)}"
@@ -81,6 +93,8 @@ def verify_state(token: str, *, secret: str, ttl: int = _STATE_TTL_SECONDS) -> S
         provider=body.get("provider", ""),
         redirect_uri=body.get("redirect_uri", ""),
         next_url=body.get("next_url", "/"),
+        # Present only when this token came from the state COOKIE (signed with
+        # ``include_verifier=True``); absent for the URL ``state=`` token.
         code_verifier=body.get("code_verifier", ""),
         iat=iat,
     )

@@ -13,6 +13,9 @@ class LinkedInProvider(OAuthProvider):
     authorization_url: str = "https://www.linkedin.com/oauth/v2/authorization"
     token_url: str = "https://www.linkedin.com/oauth/v2/accessToken"
     userinfo_url: str = "https://api.linkedin.com/v2/userinfo"
+    jwks_url: str = "https://www.linkedin.com/oauth/openid/jwks"
+    issuer: str = "https://www.linkedin.com/oauth"
+    is_oidc: bool = True
     default_scopes: list[str] = field(default_factory=lambda: ["openid", "profile", "email"])
     supports_pkce: bool = True
 

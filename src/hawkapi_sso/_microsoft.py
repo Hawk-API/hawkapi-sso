@@ -14,6 +14,9 @@ class MicrosoftProvider(OAuthProvider):
     authorization_url: str = ""
     token_url: str = ""
     userinfo_url: str = "https://graph.microsoft.com/oidc/userinfo"
+    jwks_url: str = ""
+    issuer: str = ""
+    is_oidc: bool = True
     default_scopes: list[str] = field(
         default_factory=lambda: ["openid", "email", "profile", "User.Read"]
     )
@@ -26,6 +29,16 @@ class MicrosoftProvider(OAuthProvider):
             self.authorization_url = f"{base}/authorize"
         if not self.token_url:
             self.token_url = f"{base}/token"
+        if not self.jwks_url:
+            self.jwks_url = f"{base}/keys"
+        # The v2.0 token ``iss`` embeds the resolved tenant GUID, so it is only a
+        # fixed string for a concrete tenant. For the multi-tenant aliases
+        # ("common"/"organizations"/"consumers") the issuer varies per token; leave
+        # it empty to skip strict ``iss`` matching (signature/aud/exp/nonce still
+        # enforced).
+        if not self.issuer and self.tenant not in ("common", "organizations", "consumers"):
+            self.issuer = f"https://login.microsoftonline.com/{self.tenant}/v2.0"
+        super().__post_init__()
 
     async def fetch_userinfo(self, token: OAuthToken) -> OAuthUser:
         client = self._get_client()

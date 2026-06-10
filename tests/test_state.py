@@ -25,7 +25,23 @@ def test_roundtrip() -> None:
     assert out.provider == "google"
     assert out.redirect_uri == "https://app.example/cb"
     assert out.next_url == "/me"
-    assert out.code_verifier == "v"
+    # The PKCE verifier must NOT leak into the URL-bound state token.
+    assert out.code_verifier == ""
+
+
+def test_code_verifier_only_in_cookie_variant() -> None:
+    """``code_verifier`` is serialized only when ``include_verifier=True`` (cookie)."""
+    p = StatePayload(nonce="abc", provider="google", redirect_uri="x", code_verifier="v")
+    url_token = sign_state(p, secret=SECRET)
+    cookie_token = sign_state(p, secret=SECRET, include_verifier=True)
+    assert verify_state(url_token, secret=SECRET).code_verifier == ""
+    assert verify_state(cookie_token, secret=SECRET).code_verifier == "v"
+    # And the verifier value must not appear anywhere in the URL token's bytes.
+    import base64
+
+    body_b64 = url_token.split(".", 1)[0]
+    padded = body_b64 + "=" * (-len(body_b64) % 4)
+    assert b"code_verifier" not in base64.urlsafe_b64decode(padded)
 
 
 def test_tampered_signature_rejected() -> None:

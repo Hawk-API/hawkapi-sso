@@ -27,6 +27,11 @@ class SSOConfig:
     login_path_prefix: str = "/auth/sso"
     success_redirect: str = "/"
     failure_redirect: str = "/login?error=sso"
+    # When set, only these hosts may be used to derive a callback ``redirect_uri``
+    # from the request ``Host`` header. Pinning ``provider._redirect_uri`` is
+    # preferred; this allowlist guards the Host-derived fallback (CWE-601/CWE-918).
+    allowed_hosts: tuple[str, ...] = ()
+    base_url: str = ""
 
 
 _ACTIVE: WeakKeyDictionary[Any, SSOConfig] = WeakKeyDictionary()
@@ -45,6 +50,8 @@ def init_sso(
     login_path_prefix: str = "/auth/sso",
     success_redirect: str = "/",
     failure_redirect: str = "/login?error=sso",
+    allowed_hosts: tuple[str, ...] = (),
+    base_url: str = "",
 ) -> SSOConfig:
     """Attach SSO to ``app.state.sso`` and register OAuth routes.
 
@@ -67,6 +74,8 @@ def init_sso(
         login_path_prefix=login_path_prefix.rstrip("/"),
         success_redirect=success_redirect,
         failure_redirect=failure_redirect,
+        allowed_hosts=tuple(allowed_hosts),
+        base_url=base_url.rstrip("/"),
     )
     if getattr(app, "state", None) is None:
         app.state = _StateNamespace()

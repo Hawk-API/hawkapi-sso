@@ -13,6 +13,9 @@ class GoogleProvider(OAuthProvider):
     authorization_url: str = "https://accounts.google.com/o/oauth2/v2/auth"
     token_url: str = "https://oauth2.googleapis.com/token"
     userinfo_url: str = "https://openidconnect.googleapis.com/v1/userinfo"
+    jwks_url: str = "https://www.googleapis.com/oauth2/v3/certs"
+    issuer: str = "https://accounts.google.com"
+    is_oidc: bool = True
     default_scopes: list[str] = field(default_factory=lambda: ["openid", "email", "profile"])
     supports_pkce: bool = True
 
